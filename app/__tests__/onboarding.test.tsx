@@ -32,27 +32,24 @@ describe('OnboardingScreen', () => {
     jest.clearAllMocks();
   });
 
-  it('shows first step and advances with Next', () => {
+  it('shows first step and advances with dot navigation', () => {
     renderScreen();
     expect(screen.getByText('Welcome to Money Map')).toBeTruthy();
-    fireEvent.press(screen.getByText('Next'));
-    expect(screen.getByText('Budget heads & order')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Go to step 2'));
+    expect(screen.getByText('Set income and categories')).toBeTruthy();
   });
 
   it('completes flow on final CTA', () => {
     renderScreen();
-    for (let i = 0; i < 5; i += 1) {
-      fireEvent.press(screen.getByText('Next'));
-    }
+    fireEvent.press(screen.getByLabelText('Go to step 4'));
     expect(screen.getByText('Start budget setup')).toBeTruthy();
     fireEvent.press(screen.getByText('Start budget setup'));
     expect(mockCompleteOnboarding).toHaveBeenCalledTimes(1);
     expect(router.replace).toHaveBeenCalledWith('/budget-setup');
   });
 
-  it('stays on first step when Back is pressed', () => {
+  it('starts on first step', () => {
     renderScreen();
-    fireEvent.press(screen.getByText('Back'));
-    expect(screen.getByText('Step 1 of 6')).toBeTruthy();
+    expect(screen.getAllByText('Step 1 of 4').length).toBeGreaterThan(0);
   });
 });

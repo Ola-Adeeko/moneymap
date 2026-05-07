@@ -30,7 +30,7 @@ export default function ExpensesScreen() {
         }
       />
       {expenses.length === 0 ? (
-        <EmptyState title="No expenses yet" subtitle="Every expense belongs to a budget head." />
+        <EmptyState title="No expenses yet" subtitle="Every expense belongs to a category." />
       ) : (
         expenses.map((expense) => {
           const head = templates.find((t) => t.id === expense.budgetHeadId);

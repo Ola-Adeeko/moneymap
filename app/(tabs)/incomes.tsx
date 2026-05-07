@@ -34,7 +34,7 @@ export default function IncomesScreen() {
       />
       <Text style={styles.month}>{monthLabel(monthKey)}</Text>
       {incomes.length === 0 ? (
-        <EmptyState title="No incomes this month" subtitle="Add income to trigger allocation into your budget heads." />
+        <EmptyState title="No incomes this month" subtitle="Add income to trigger allocation into your spending categories." />
       ) : (
         incomes.map((income) => (
           <Pressable

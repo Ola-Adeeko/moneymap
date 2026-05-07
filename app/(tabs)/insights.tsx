@@ -99,7 +99,7 @@ export default function InsightsScreen() {
   const disposable = monthHeads.find((h) => h.budgetHeadTemplateId === disposableId);
 
   const messages = [
-    `You have funded ${fundedCount} of ${monthHeads.length} budget heads.`,
+    `You have funded ${fundedCount} of ${monthHeads.length} categories.`,
     ...overspent.map((head) => {
       const name = templates.find((t) => t.id === head.budgetHeadTemplateId)?.name ?? 'A head';
       return `${name} is overspent by ${(head.spentAmount - head.allocatedAmount).toLocaleString()}.`;
@@ -108,7 +108,7 @@ export default function InsightsScreen() {
       const name = templates.find((t) => t.id === head.budgetHeadTemplateId)?.name ?? 'A head';
       return `${name} is not yet funded this month.`;
     }),
-    `Your disposable balance is ${(disposable?.availableBalance ?? 0).toLocaleString()}.`,
+    `Your free spend balance is ${(disposable?.availableBalance ?? 0).toLocaleString()}.`,
   ];
 
   return (

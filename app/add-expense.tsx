@@ -20,7 +20,7 @@ const schema = z.object({
     .refine((value) => !Number.isNaN(Number(value)) && Number(value) > 0, {
       message: 'Expense amount must be greater than 0',
     }),
-  budgetHeadId: z.string().min(1, 'Kindly select a budget head'),
+  budgetHeadId: z.string().min(1, 'Kindly select a category'),
   description: z.string().min(2, 'Kindly enter expense description'),
   paymentMethod: z.string().min(2, 'Kindly enter payment method'),
   note: z.string().optional(),

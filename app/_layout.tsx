@@ -1,16 +1,27 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { Compass } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, StyleSheet, Text, View } from 'react-native';
-import 'react-native-reanimated';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { Compass } from "lucide-react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import "react-native-reanimated";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { useAppTheme } from '@/src/hooks/use-app-theme';
+import { useAppTheme } from "@/src/hooks/use-app-theme";
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  anchor: "(tabs)",
 };
 
 export default function RootLayout() {
@@ -21,7 +32,7 @@ export default function RootLayout() {
   const glow = useRef(new Animated.Value(0.3)).current;
   const navTheme = useMemo(
     () =>
-      effectiveScheme === 'dark'
+      effectiveScheme === "dark"
         ? {
             ...DarkTheme,
             colors: {
@@ -51,7 +62,7 @@ export default function RootLayout() {
       colors.text,
       colors.border,
       colors.primary,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -69,7 +80,7 @@ export default function RootLayout() {
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
 
     Animated.loop(
@@ -86,7 +97,7 @@ export default function RootLayout() {
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
 
     Animated.loop(
@@ -103,7 +114,7 @@ export default function RootLayout() {
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
 
     const timeout = setTimeout(() => setShowLaunchSplash(false), 3500);
@@ -113,7 +124,9 @@ export default function RootLayout() {
   if (showLaunchSplash) {
     return (
       <SafeAreaProvider>
-        <View style={[styles.splashPage, { backgroundColor: colors.background }]}>
+        <View
+          style={[styles.splashPage, { backgroundColor: colors.background }]}
+        >
           <Animated.View
             style={[
               styles.ring,
@@ -121,6 +134,7 @@ export default function RootLayout() {
                 borderColor: colors.primary,
                 opacity: glow,
                 transform: [
+                  { translateY: -80 },
                   {
                     scale: pulse.interpolate({
                       inputRange: [0, 1],
@@ -138,16 +152,17 @@ export default function RootLayout() {
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
                 shadowColor: colors.primary,
-                transform: [{ translateY: floatY }],
+                transform: [{ translateY: Animated.add(floatY, -80) }],
               },
-            ]}>
+            ]}
+          >
             <Compass size={40} color={colors.primary} strokeWidth={2.4} />
           </Animated.View>
           <Text style={[styles.title, { color: colors.text }]}>Money Map</Text>
+          <ActivityIndicator style={styles.loader} color={colors.primary} />
           <Text style={[styles.subtitle, { color: colors.subtext }]}>
             Plan smarter. Spend intentionally.
           </Text>
-          <ActivityIndicator style={styles.loader} color={colors.primary} />
         </View>
       </SafeAreaProvider>
     );
@@ -159,12 +174,22 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="budget-setup" options={{ title: 'Budget Setup' }} />
-          <Stack.Screen name="add-income" options={{ title: 'Add Income' }} />
-          <Stack.Screen name="add-expense" options={{ title: 'Add Expense' }} />
-          <Stack.Screen name="budget-head/[id]" options={{ title: 'Budget Head Detail' }} />
+          <Stack.Screen
+            name="budget-setup"
+            options={{ title: "Budget Setup" }}
+          />
+          <Stack.Screen
+            name="categories"
+            options={{ title: "Categories" }}
+          />
+          <Stack.Screen name="add-income" options={{ title: "Add Income" }} />
+          <Stack.Screen name="add-expense" options={{ title: "Add Expense" }} />
+          <Stack.Screen
+            name="budget-head/[id]"
+            options={{ title: "Category Detail" }}
+          />
         </Stack>
-        <StatusBar style={effectiveScheme === 'dark' ? 'light' : 'dark'} />
+        <StatusBar style={effectiveScheme === "dark" ? "light" : "dark"} />
       </ThemeProvider>
     </SafeAreaProvider>
   );
@@ -173,16 +198,17 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   splashPage: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 28,
   },
   logoWrap: {
     width: 84,
     height: 84,
     borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     marginBottom: 16,
     shadowOpacity: 0.35,
@@ -191,13 +217,13 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   ring: {
-    position: 'absolute',
+    position: "absolute",
     width: 132,
     height: 132,
     borderRadius: 999,
     borderWidth: 1.4,
   },
-  title: { fontSize: 30, fontWeight: '800' },
-  subtitle: { marginTop: 8, fontWeight: '600' },
-  loader: { marginTop: 22 },
+  title: { fontSize: 30, fontWeight: "800", marginTop: 4, textAlign: "center" },
+  subtitle: { marginTop: 14, fontWeight: "600", textAlign: "center" },
+  loader: { marginTop: 16 },
 });

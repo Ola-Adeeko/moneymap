@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react-native';
+import Index from '@/app/index';
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -16,8 +17,6 @@ jest.mock('@/src/store/use-budget-store', () => ({
   useBudgetStore: (fn: (s: { settings: { setupComplete: boolean } }) => unknown) =>
     fn({ settings: { setupComplete: mockSetupComplete.value } }),
 }));
-
-import Index from '@/app/index';
 
 describe('app/index', () => {
   it('redirects to onboarding when setup is incomplete', () => {

@@ -27,23 +27,23 @@ export default function BudgetHeadDetailScreen() {
   if (!template || !state) {
     return (
       <View style={styles.center}>
-        <Text style={styles.text}>Budget head not found.</Text>
+        <Text style={styles.text}>Category not found.</Text>
       </View>
     );
   }
+  const displayName = template.type === 'disposable' ? 'Free Spend' : template.name;
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{template.name}</Text>
+      <Text style={styles.title}>{displayName}</Text>
       <View style={styles.card}>
-        <Text style={styles.text}>Target: {state.targetAmount.toLocaleString()}</Text>
-        <Text style={styles.text}>Allocated: {state.allocatedAmount.toLocaleString()}</Text>
+        <Text style={styles.text}>Budget: {state.targetAmount.toLocaleString()}</Text>
+        <Text style={styles.text}>Funded: {state.allocatedAmount.toLocaleString()}</Text>
         <Text style={styles.text}>Spent: {state.spentAmount.toLocaleString()}</Text>
-        <Text style={styles.text}>Remaining: {state.availableBalance.toLocaleString()}</Text>
-        <Text style={styles.text}>Gap: {state.unfundedGap.toLocaleString()}</Text>
+        <Text style={styles.text}>Available: {state.availableBalance.toLocaleString()}</Text>
       </View>
       <View style={styles.card}>
-        <Text style={styles.subtitle}>Income allocations</Text>
+        <Text style={styles.subtitle}>Funding History</Text>
         {allocations.map((entry) => (
           <Text style={styles.text} key={entry.id}>
             {entry.allocationType.toUpperCase()} +{entry.allocatedAmount.toLocaleString()}
@@ -51,7 +51,7 @@ export default function BudgetHeadDetailScreen() {
         ))}
       </View>
       <View style={styles.card}>
-        <Text style={styles.subtitle}>Expenses</Text>
+        <Text style={styles.subtitle}>Expense History</Text>
         {expenses.map((entry) => (
           <Text style={styles.text} key={entry.id}>
             {entry.description} -{entry.amount.toLocaleString()}

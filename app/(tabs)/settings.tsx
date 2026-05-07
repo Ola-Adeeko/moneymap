@@ -51,7 +51,7 @@ export default function SettingsScreen() {
         onPress={() =>
           Alert.alert(
             'Reset all data?',
-            'This will permanently remove all budget heads, incomes, expenses, allocations, and monthly states on this device.',
+            'This will permanently remove all categories, incomes, expenses, allocations, and monthly states on this device.',
             [
               { text: 'Cancel', style: 'cancel' },
               {

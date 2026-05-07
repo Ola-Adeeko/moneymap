@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { DEFAULT_HEADS, MOCK_EXPENSES, MOCK_INCOMES } from '@/src/data/seed';
+import { DEFAULT_HEADS } from '@/src/data/seed';
 import {
   AllocationEntry,
   AppSettings,
@@ -41,10 +41,11 @@ interface StoreState {
   completeOnboarding: () => void;
   setSelectedMonth: (monthKey: string) => void;
   initMonthIfNeeded: (monthKey: string) => void;
-  addBudgetHead: (head: Omit<BudgetHeadTemplate, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addBudgetHead: (head: Omit<BudgetHeadTemplate, 'id' | 'createdAt' | 'updatedAt'>) => string;
   updateBudgetHead: (headId: string, updates: Partial<BudgetHeadTemplate>) => void;
   deleteBudgetHead: (headId: string) => void;
   reorderHeads: (orderedIds: string[]) => void;
+  fundCategoryFromFreeSpend: (headId: string, monthKey: string) => number;
   addIncome: (payload: {
     monthKey: string;
     amount: number;
@@ -89,7 +90,7 @@ const ensureDisposable = (templates: BudgetHeadTemplate[]): BudgetHeadTemplate[]
   const now = new Date().toISOString();
   const disposable: BudgetHeadTemplate = {
     id: `h-disposable-${Date.now()}`,
-    name: 'Disposable',
+    name: 'Free Spend',
     icon: '🧃',
     monthlyTarget: 0,
     priority: 999,
@@ -102,19 +103,8 @@ const ensureDisposable = (templates: BudgetHeadTemplate[]): BudgetHeadTemplate[]
 };
 
 const bootMonth = currentMonthKey();
-const baseTemplates = ensureDisposable(DEFAULT_HEADS);
+const baseTemplates = ensureDisposable(DEFAULT_HEADS.filter((head) => head.type === 'disposable'));
 const initialMonthState = initializeMonthState(bootMonth, baseTemplates);
-const initialAllocations = autoAllocateIncome({
-  monthKey: bootMonth,
-  incomeEntryId: MOCK_INCOMES[0].id,
-  amount: MOCK_INCOMES[0].amount,
-  monthStates: initialMonthState,
-  templates: baseTemplates,
-});
-const monthAfterExpense = initialAllocations.updatedStates.map((head) => {
-  const matching = MOCK_EXPENSES.filter((expense) => expense.budgetHeadId === head.budgetHeadTemplateId);
-  return matching.reduce((acc, expense) => recalculateAfterExpense(acc, expense.amount), head);
-});
 
 const syncMonthStateWithTemplates = ({
   monthKey,
@@ -127,8 +117,20 @@ const syncMonthStateWithTemplates = ({
 }) => {
   const byTemplateId = new Map(monthStates.map((state) => [state.budgetHeadTemplateId, state]));
   return sortTemplatesBySetupOrder(templates.filter((head) => head.isActive)).map(
-      (template) =>
-        byTemplateId.get(template.id) ?? {
+      (template) => {
+        const existing = byTemplateId.get(template.id);
+        if (existing) {
+          const targetAmount = template.monthlyTarget;
+          const isFullyFunded = existing.allocatedAmount >= targetAmount;
+          const unfundedGap = Math.max(0, targetAmount - existing.allocatedAmount);
+          return {
+            ...existing,
+            targetAmount,
+            isFullyFunded,
+            unfundedGap,
+          };
+        }
+        return {
           id: `${monthKey}-${template.id}`,
           monthKey,
           budgetHeadTemplateId: template.id,
@@ -138,8 +140,34 @@ const syncMonthStateWithTemplates = ({
           isFullyFunded: template.monthlyTarget === 0,
           availableBalance: 0,
           unfundedGap: template.monthlyTarget,
-        }
+        };
+      }
     );
+};
+
+const syncAllMonthStatesWithTemplates = ({
+  monthStatesMap,
+  templates,
+}: {
+  monthStatesMap: Record<string, MonthlyBudgetHeadState[]>;
+  templates: BudgetHeadTemplate[];
+}) => {
+  const next: Record<string, MonthlyBudgetHeadState[]> = {};
+  for (const [monthKey, monthStates] of Object.entries(monthStatesMap)) {
+    next[monthKey] = syncMonthStateWithTemplates({ monthKey, monthStates, templates });
+  }
+  return next;
+};
+
+const updateDerivedState = (state: MonthlyBudgetHeadState): MonthlyBudgetHeadState => {
+  const availableBalance = state.allocatedAmount - state.spentAmount;
+  const unfundedGap = Math.max(0, state.targetAmount - state.allocatedAmount);
+  return {
+    ...state,
+    availableBalance,
+    unfundedGap,
+    isFullyFunded: unfundedGap === 0,
+  };
 };
 
 const recalculateMonthFromEntries = ({
@@ -197,10 +225,10 @@ export const useBudgetStore = create<StoreState>()(
   persist(
     (set, get) => ({
       templates: baseTemplates,
-      monthStates: { [bootMonth]: monthAfterExpense },
-      incomes: MOCK_INCOMES,
-      expenses: MOCK_EXPENSES,
-      allocations: initialAllocations.entries,
+      monthStates: { [bootMonth]: initialMonthState },
+      incomes: [],
+      expenses: [],
+      allocations: [],
       settings: defaultSettings,
       selectedMonthKey: bootMonth,
 
@@ -221,9 +249,12 @@ export const useBudgetStore = create<StoreState>()(
           };
         }),
       addBudgetHead: (head) =>
-        set((state) => {
+        (() => {
+          let createdId = '';
+          set((state) => {
           const now = new Date().toISOString();
           const newHeadId = `h-${Date.now()}`;
+          createdId = newHeadId;
           const selectedMonthKey = state.selectedMonthKey;
           const templates = ensureDisposable([
             ...state.templates,
@@ -242,22 +273,38 @@ export const useBudgetStore = create<StoreState>()(
               [selectedMonthKey]: nextMonthStates,
             },
           };
-        }),
+          });
+          return createdId;
+        })(),
       updateBudgetHead: (headId, updates) =>
-        set((state) => ({
-          templates: ensureDisposable(
+        set((state) => {
+          const templates = ensureDisposable(
             state.templates.map((head) =>
               head.id === headId ? { ...head, ...updates, updatedAt: new Date().toISOString() } : head
             )
-          ),
-        })),
+          );
+          return {
+            templates,
+            monthStates: syncAllMonthStatesWithTemplates({
+              monthStatesMap: state.monthStates,
+              templates,
+            }),
+          };
+        }),
       deleteBudgetHead: (headId) =>
-        set((state) => ({
-          templates: ensureDisposable(state.templates.filter((head) => head.id !== headId)),
-        })),
+        set((state) => {
+          const templates = ensureDisposable(state.templates.filter((head) => head.id !== headId));
+          return {
+            templates,
+            monthStates: syncAllMonthStatesWithTemplates({
+              monthStatesMap: state.monthStates,
+              templates,
+            }),
+          };
+        }),
       reorderHeads: (orderedIds) =>
-        set((state) => ({
-          templates: ensureDisposable(
+        set((state) => {
+          const templates = ensureDisposable(
             state.templates.map((head) => {
               if (head.type === 'disposable') {
                 return { ...head, priority: 999 };
@@ -265,8 +312,58 @@ export const useBudgetStore = create<StoreState>()(
               const idx = orderedIds.indexOf(head.id);
               return idx >= 0 ? { ...head, priority: idx + 1 } : head;
             })
-          ),
-        })),
+          );
+          return {
+            templates,
+            monthStates: syncAllMonthStatesWithTemplates({
+              monthStatesMap: state.monthStates,
+              templates,
+            }),
+          };
+        }),
+      fundCategoryFromFreeSpend: (headId, monthKey) => {
+        let fundedAmount = 0;
+        set((state) => {
+          const monthStates = state.monthStates[monthKey] ?? [];
+          if (monthStates.length === 0) return state;
+          const disposableTemplate = state.templates.find((head) => head.type === 'disposable');
+          if (!disposableTemplate) return state;
+
+          const disposableIdx = monthStates.findIndex(
+            (entry) => entry.budgetHeadTemplateId === disposableTemplate.id
+          );
+          const targetIdx = monthStates.findIndex(
+            (entry) => entry.budgetHeadTemplateId === headId
+          );
+          if (disposableIdx < 0 || targetIdx < 0) return state;
+
+          const disposable = monthStates[disposableIdx];
+          const target = monthStates[targetIdx];
+          const needed = Math.max(0, target.targetAmount - target.allocatedAmount);
+          const movable = Math.max(0, disposable.availableBalance);
+          const amount = Math.min(needed, movable);
+          if (amount <= 0) return state;
+
+          fundedAmount = amount;
+          const next = [...monthStates];
+          next[disposableIdx] = updateDerivedState({
+            ...disposable,
+            allocatedAmount: Math.max(0, disposable.allocatedAmount - amount),
+          });
+          next[targetIdx] = updateDerivedState({
+            ...target,
+            allocatedAmount: target.allocatedAmount + amount,
+          });
+
+          return {
+            monthStates: {
+              ...state.monthStates,
+              [monthKey]: next,
+            },
+          };
+        });
+        return fundedAmount;
+      },
       addIncome: (payload) =>
         set((state) => {
           const now = new Date().toISOString();
@@ -416,8 +513,8 @@ export const useBudgetStore = create<StoreState>()(
       setThemeMode: (mode) => set((state) => ({ settings: { ...state.settings, themeMode: mode } })),
       resetData: () =>
         set((state) => ({
-          templates: [],
-          monthStates: {},
+          templates: ensureDisposable(DEFAULT_HEADS.filter((head) => head.type === 'disposable')),
+          monthStates: { [bootMonth]: initializeMonthState(bootMonth, ensureDisposable(DEFAULT_HEADS.filter((head) => head.type === 'disposable'))) },
           incomes: [],
           expenses: [],
           allocations: [],

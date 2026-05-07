@@ -12,7 +12,7 @@ export const DEFAULT_HEADS: BudgetHeadTemplate[] = [
   { id: 'h-transport', name: 'Transport', icon: '🚌', monthlyTarget: 50000, priority: 5, type: 'essential', isActive: true, createdAt: now, updatedAt: now },
   { id: 'h-savings', name: 'Savings', icon: '💰', monthlyTarget: 50000, priority: 6, type: 'savings', isActive: true, createdAt: now, updatedAt: now },
   { id: 'h-invest', name: 'Investment', icon: '📈', monthlyTarget: 50000, priority: 7, type: 'investment', isActive: true, createdAt: now, updatedAt: now },
-  { id: 'h-disposable', name: 'Disposable', icon: '🧃', monthlyTarget: 0, priority: 999, type: 'disposable', isActive: true, createdAt: now, updatedAt: now },
+  { id: 'h-disposable', name: 'Free Spend', icon: '🧃', monthlyTarget: 0, priority: 999, type: 'disposable', isActive: true, createdAt: now, updatedAt: now },
 ];
 
 export const MOCK_INCOMES: IncomeEntry[] = [

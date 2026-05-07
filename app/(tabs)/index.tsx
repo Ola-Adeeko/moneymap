@@ -1,11 +1,9 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Plus, Wallet } from 'lucide-react-native';
+import { useMemo } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Plus } from 'lucide-react-native';
 
 import { AppHeader } from '@/src/components/AppHeader';
-import { BudgetHeadCard } from '@/src/components/BudgetHeadCard';
-import { EmptyState } from '@/src/components/EmptyState';
 import { MonthSelector } from '@/src/components/MonthSelector';
 import { SectionTitle } from '@/src/components/SectionTitle';
 import { SummaryCard } from '@/src/components/SummaryCard';
@@ -13,30 +11,51 @@ import { CurrencyText } from '@/src/components/CurrencyText';
 import { ThemeColors } from '@/src/constants/colors';
 import { useAppTheme } from '@/src/hooks/use-app-theme';
 import { useBudgetStore } from '@/src/store/use-budget-store';
-import { sortMonthStatesBySetupOrder } from '@/src/utils/budgetHeadOrder';
-import { formatCurrency } from '@/src/utils/currency';
 
 export default function HomeScreen() {
   const { colors } = useAppTheme();
   const styles = createStyles(colors);
-  const [showDisposableModal, setShowDisposableModal] = useState(false);
-  const templates = useBudgetStore((s) => s.templates);
-  const activeTemplateMap = useMemo(
-    () => new Map(templates.filter((template) => template.isActive).map((template) => [template.id, template])),
-    [templates]
-  );
   const selectedMonthKey = useBudgetStore((s) => s.selectedMonthKey);
-  const monthStatesMap = useBudgetStore((s) => s.monthStates);
-  const monthStates = useMemo(() => {
-    const raw = monthStatesMap[selectedMonthKey] ?? [];
-    const filtered = raw.filter((state) => activeTemplateMap.has(state.budgetHeadTemplateId));
-    return sortMonthStatesBySetupOrder(filtered, templates);
-  }, [monthStatesMap, selectedMonthKey, activeTemplateMap, templates]);
-  const currency = useBudgetStore((s) => s.settings.currency);
   const setSelectedMonth = useBudgetStore((s) => s.setSelectedMonth);
   const initMonthIfNeeded = useBudgetStore((s) => s.initMonthIfNeeded);
-  const getMonthSummary = useBudgetStore((s) => s.getMonthSummary);
-  const summary = getMonthSummary(selectedMonthKey);
+  const templates = useBudgetStore((s) => s.templates);
+  const monthStatesMap = useBudgetStore((s) => s.monthStates);
+  const incomes = useBudgetStore((s) => s.incomes);
+
+  const summary = useMemo(() => {
+    const monthHeads = monthStatesMap[selectedMonthKey] ?? [];
+    const activeTemplates = templates.filter((head) => head.isActive);
+    const activeTemplateMap = new Map(activeTemplates.map((head) => [head.id, head]));
+    const activeMonthHeads = monthHeads.filter((head) => activeTemplateMap.has(head.budgetHeadTemplateId));
+    const nonDisposableHeads = activeMonthHeads.filter((head) => {
+      const template = activeTemplateMap.get(head.budgetHeadTemplateId);
+      return template?.type !== 'disposable';
+    });
+    const totalIncome = incomes
+      .filter((income) => income.monthKey === selectedMonthKey)
+      .reduce((sum, income) => sum + income.amount, 0);
+    const totalAllocated = activeMonthHeads.reduce((sum, head) => sum + head.allocatedAmount, 0);
+    const totalSpent = activeMonthHeads.reduce((sum, head) => sum + head.spentAmount, 0);
+    const totalBudgetTarget = nonDisposableHeads.reduce((sum, head) => sum + head.targetAmount, 0);
+    const disposable = templates.find((head) => head.type === 'disposable');
+    const disposableState = disposable
+      ? activeMonthHeads.find((head) => head.budgetHeadTemplateId === disposable.id)
+      : undefined;
+    return {
+      totalIncome,
+      totalAllocated,
+      totalSpent,
+      totalBudgetTarget,
+      disposableBalance: disposableState?.availableBalance ?? 0,
+    };
+  }, [monthStatesMap, selectedMonthKey, templates, incomes]);
+
+  const totalIncome = summary.totalIncome;
+  const disposableBalance = summary.disposableBalance;
+  const totalSpent = summary.totalSpent;
+  const totalAllocated = summary.totalAllocated;
+  const totalBudgetTarget = summary.totalBudgetTarget;
+  const budgetLeft = Math.max(totalAllocated - totalSpent, 0);
 
   const shiftMonth = (step: number) => {
     const [year, month] = selectedMonthKey.split('-').map(Number);
@@ -48,92 +67,39 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <AppHeader
-        title="Money Map"
-        right={
-          <Pressable
-            style={styles.quickBtn}
-            onPress={() => setShowDisposableModal(true)}>
-            <View style={styles.quickTopRow}>
-              <Wallet size={12} color={colors.primary} strokeWidth={2.2} />
-              <Text style={styles.quickLabel}>Disposable</Text>
-            </View>
-            <CurrencyText amount={summary.disposableBalance} style={styles.quickText} />
-          </Pressable>
-        }
-      />
+      <AppHeader title="Money Map" />
       <MonthSelector monthKey={selectedMonthKey} onPrev={() => shiftMonth(-1)} onNext={() => shiftMonth(1)} />
 
       <View style={styles.summaryGrid}>
         <View style={styles.summaryRow}>
           <View style={styles.gridItem}>
-            <SummaryCard label="Total Income" value={`${summary.totalIncome.toLocaleString()}`} />
+            <SummaryCard label="Total Income" value={`${totalIncome.toLocaleString()}`} tone="income" />
           </View>
           <View style={styles.gridItem}>
-            <SummaryCard label="Total Allocated" value={`${summary.totalAllocated.toLocaleString()}`} />
+            <SummaryCard label="Free Spend Balance" value={`${disposableBalance.toLocaleString()}`} tone="balance" />
           </View>
         </View>
         <View style={styles.summaryRow}>
           <View style={styles.gridItem}>
-            <SummaryCard label="Total Spent" value={`${summary.totalSpent.toLocaleString()}`} />
+            <SummaryCard label="Total Expenses" value={`${totalSpent.toLocaleString()}`} tone="expense" />
           </View>
           <View style={styles.gridItem}>
-            <SummaryCard label="Unfunded Gap" value={`${summary.totalUnfundedGap.toLocaleString()}`} />
+            <SummaryCard label="Unspent Balance" value={`${budgetLeft.toLocaleString()}`} tone="balance" />
           </View>
         </View>
       </View>
 
-      <SectionTitle>Budget Heads</SectionTitle>
-      <Pressable style={styles.action} onPress={() => router.push('/budget-setup')}>
+      <SectionTitle>Spending Categories</SectionTitle>
+      <Pressable style={styles.action} onPress={() => router.push('/categories')}>
         <Text style={styles.actionLabel}>Total Planned Budget</Text>
         <View style={styles.actionRow}>
-          <CurrencyText amount={summary.totalBudgetTarget} style={styles.actionText} />
+          <CurrencyText amount={totalBudgetTarget} style={styles.actionText} />
           <View style={styles.actionPill}>
             <Plus size={14} color={colors.primary} strokeWidth={2.4} />
           </View>
         </View>
-        <Text style={styles.actionHint}>Manage Budget Heads</Text>
+        <Text style={styles.actionHint}>View Categories</Text>
       </Pressable>
-      {monthStates.length === 0 ? (
-        <EmptyState title="No budget heads yet" subtitle="Create monthly heads to start allocating income." />
-      ) : (
-        monthStates.map((state) => {
-          const template = templates.find((t) => t.id === state.budgetHeadTemplateId);
-          if (!template) return null;
-          return (
-            <BudgetHeadCard
-              key={state.id}
-              name={template.name}
-              state={state}
-              onPress={() => router.push(`/budget-head/${template.id}`)}
-            />
-          );
-        })
-      )}
-
-      <Modal
-        visible={showDisposableModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDisposableModal(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalTitleRow}>
-              <Wallet size={16} color={colors.primary} strokeWidth={2.3} />
-              <Text style={styles.modalTitle}>Disposable Balance</Text>
-            </View>
-            <Text style={styles.modalAmount}>
-              {formatCurrency(summary.disposableBalance, currency)}
-            </Text>
-            <Text style={styles.modalBody}>
-              This is your flexible spend amount for the selected month. You can use it for any unplanned or lifestyle spending.
-            </Text>
-            <Pressable style={styles.modalBtn} onPress={() => setShowDisposableModal(false)}>
-              <Text style={styles.modalBtnText}>Got it</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
     </ScrollView>
   );
 }
@@ -150,39 +116,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   actionLabel: { color: colors.subtext, fontSize: 12, fontWeight: '600' },
   actionHint: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   actionPill: { width: 28, height: 28, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.border },
-  quickBtn: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, gap: 2 },
-  quickTopRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  quickLabel: { color: colors.subtext, fontWeight: '700', fontSize: 10 },
-  quickText: { color: colors.primary, fontWeight: '800', fontSize: 12 },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(3, 6, 14, 0.78)',
-    justifyContent: 'center',
-    padding: 22,
-  },
-  modalCard: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    padding: 16,
-    gap: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
-  },
-  modalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  modalTitle: { color: colors.text, fontWeight: '800', fontSize: 16 },
-  modalAmount: { color: colors.primary, fontWeight: '800', fontSize: 26 },
-  modalBody: { color: colors.subtext, lineHeight: 20 },
-  modalBtn: {
-    marginTop: 4,
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  modalBtnText: { color: '#fff', fontWeight: '700' },
 });

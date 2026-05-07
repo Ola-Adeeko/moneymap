@@ -22,9 +22,11 @@ export function BudgetHeadCard({
   const status =
     state.spentAmount > state.allocatedAmount
       ? { text: 'Overspent', tone: 'bad' as const }
-      : state.unfundedGap > 0
-        ? { text: 'Underfunded', tone: 'warn' as const }
-        : { text: 'Safe', tone: 'good' as const };
+      : state.allocatedAmount === 0
+        ? { text: 'Not Funded', tone: 'warn' as const }
+        : state.allocatedAmount < state.targetAmount
+          ? { text: 'Partially Funded', tone: 'warn' as const }
+          : { text: 'Funded', tone: 'good' as const };
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
@@ -32,24 +34,21 @@ export function BudgetHeadCard({
         <Text style={styles.name}>{name}</Text>
         <StatusBadge text={status.text} tone={status.tone} />
       </View>
-      <View style={styles.metrics}>
+      <View style={styles.metricRow}>
         <Text style={styles.meta}>
-          Target <CurrencyText amount={state.targetAmount} />
+          Budget <CurrencyText amount={state.targetAmount} />
         </Text>
         <Text style={styles.meta}>
-          Allocated <CurrencyText amount={state.allocatedAmount} />
-        </Text>
-        <Text style={styles.meta}>
-          Spent <CurrencyText amount={state.spentAmount} />
+          Funded <CurrencyText amount={state.allocatedAmount} />
         </Text>
       </View>
       <ProgressBar value={state.allocatedAmount} max={Math.max(1, state.targetAmount)} />
-      <View style={styles.footer}>
+      <View style={styles.metricRow}>
         <Text style={styles.meta}>
-          Available <CurrencyText amount={state.availableBalance} />
+          Spent <CurrencyText amount={state.spentAmount} />
         </Text>
         <Text style={styles.meta}>
-          Gap <CurrencyText amount={state.unfundedGap} />
+          Available <CurrencyText amount={state.availableBalance} />
         </Text>
       </View>
     </Pressable>
@@ -67,7 +66,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   name: { fontSize: 16, fontWeight: '700', color: colors.text },
-  metrics: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 },
+  metricRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 6 },
   meta: { color: colors.subtext, fontSize: 12 },
-  footer: { flexDirection: 'row', justifyContent: 'space-between' },
 });

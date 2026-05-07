@@ -24,7 +24,7 @@ describe('BudgetHeadCard', () => {
   it('renders name and status', () => {
     render(<BudgetHeadCard name="Rent" state={baseState} />);
     expect(screen.getByText('Rent')).toBeTruthy();
-    expect(screen.getByText('Underfunded')).toBeTruthy();
+    expect(screen.getByText('Partially Funded')).toBeTruthy();
   });
 
   it('invokes onPress when pressed', () => {
