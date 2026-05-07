@@ -170,6 +170,39 @@ const updateDerivedState = (state: MonthlyBudgetHeadState): MonthlyBudgetHeadSta
   };
 };
 
+const moveDeletedCategoryBalancesToFreeSpend = ({
+  monthStatesMap,
+  deletedHeadId,
+  disposableId,
+}: {
+  monthStatesMap: Record<string, MonthlyBudgetHeadState[]>;
+  deletedHeadId: string;
+  disposableId: string;
+}) => {
+  const next: Record<string, MonthlyBudgetHeadState[]> = {};
+  for (const [monthKey, monthStates] of Object.entries(monthStatesMap)) {
+    const deletedIdx = monthStates.findIndex((entry) => entry.budgetHeadTemplateId === deletedHeadId);
+    const disposableIdx = monthStates.findIndex((entry) => entry.budgetHeadTemplateId === disposableId);
+    if (deletedIdx < 0 || disposableIdx < 0) {
+      next[monthKey] = monthStates;
+      continue;
+    }
+
+    const deletedState = monthStates[deletedIdx];
+    const disposableState = monthStates[disposableIdx];
+    const updatedDisposable = updateDerivedState({
+      ...disposableState,
+      allocatedAmount: disposableState.allocatedAmount + deletedState.allocatedAmount,
+      spentAmount: disposableState.spentAmount + deletedState.spentAmount,
+    });
+
+    const updatedMonth = [...monthStates];
+    updatedMonth[disposableIdx] = updatedDisposable;
+    next[monthKey] = updatedMonth;
+  }
+  return next;
+};
+
 const recalculateMonthFromEntries = ({
   monthKey,
   templates,
@@ -294,10 +327,19 @@ export const useBudgetStore = create<StoreState>()(
       deleteBudgetHead: (headId) =>
         set((state) => {
           const templates = ensureDisposable(state.templates.filter((head) => head.id !== headId));
+          const disposableId = templates.find((head) => head.type === 'disposable')?.id;
+          const monthStatesMap =
+            disposableId && headId !== disposableId
+              ? moveDeletedCategoryBalancesToFreeSpend({
+                  monthStatesMap: state.monthStates,
+                  deletedHeadId: headId,
+                  disposableId,
+                })
+              : state.monthStates;
           return {
             templates,
             monthStates: syncAllMonthStatesWithTemplates({
-              monthStatesMap: state.monthStates,
+              monthStatesMap,
               templates,
             }),
           };

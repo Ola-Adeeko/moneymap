@@ -53,9 +53,8 @@ export default function HomeScreen() {
   const totalIncome = summary.totalIncome;
   const disposableBalance = summary.disposableBalance;
   const totalSpent = summary.totalSpent;
-  const totalAllocated = summary.totalAllocated;
   const totalBudgetTarget = summary.totalBudgetTarget;
-  const budgetLeft = Math.max(totalAllocated - totalSpent, 0);
+  const budgetLeft = Math.max(totalBudgetTarget - totalSpent, 0);
 
   const shiftMonth = (step: number) => {
     const [year, month] = selectedMonthKey.split('-').map(Number);

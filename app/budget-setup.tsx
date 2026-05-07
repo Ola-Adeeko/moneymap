@@ -1,8 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 
 import { AmountInput } from "@/src/components/AmountInput";
@@ -26,6 +26,11 @@ const schema = z.object({
 });
 
 type FormValue = z.infer<typeof schema>;
+type FundingPrompt = {
+  headId: string;
+  freeSpendLabel: string;
+  categoryAmountLabel: string;
+};
 
 export default function BudgetSetupScreen() {
   const { colors } = useAppTheme();
@@ -44,6 +49,7 @@ export default function BudgetSetupScreen() {
   const selectedMonthKey = useBudgetStore((s) => s.selectedMonthKey);
   const getMonthSummary = useBudgetStore((s) => s.getMonthSummary);
   const fundCategoryFromFreeSpend = useBudgetStore((s) => s.fundCategoryFromFreeSpend);
+  const [fundingPrompt, setFundingPrompt] = useState<FundingPrompt | null>(null);
   const {
     handleSubmit,
     setValue,
@@ -76,19 +82,11 @@ export default function BudgetSetupScreen() {
     const formattedCategoryAmount = formatCurrency(newCategoryAmount, currency);
 
     if (freeSpendBalance > 0 && newCategoryAmount > 0) {
-      Alert.alert(
-        "Fund new category?",
-        `You have Free Spend balance of ${formattedFreeSpend}. Fund this new category (${formattedCategoryAmount}) from Free Spend?`,
-        [
-          { text: "Keep Unfunded", style: "cancel" },
-          {
-            text: "Fund Now",
-            onPress: () => {
-              fundCategoryFromFreeSpend(newHeadId, selectedMonthKey);
-            },
-          },
-        ]
-      );
+      setFundingPrompt({
+        headId: newHeadId,
+        freeSpendLabel: formattedFreeSpend,
+        categoryAmountLabel: formattedCategoryAmount,
+      });
     }
     reset();
   };
@@ -106,7 +104,8 @@ export default function BudgetSetupScreen() {
   };
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+    <>
+      <ScrollView style={styles.page} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Spending Categories</Text>
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>Total Category Target</Text>
@@ -187,7 +186,43 @@ export default function BudgetSetupScreen() {
           <Text style={styles.addText}>Continue to Dashboard</Text>
         </Pressable>
       )}
-    </ScrollView>
+      </ScrollView>
+
+      <Modal
+        visible={Boolean(fundingPrompt)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFundingPrompt(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Fund new category?</Text>
+            <Text style={styles.modalBody}>
+              {`You have Free Spend balance of ${fundingPrompt?.freeSpendLabel ?? ""}. Fund this new category (${fundingPrompt?.categoryAmountLabel ?? ""}) from Free Spend?`}
+            </Text>
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnSecondary]}
+                onPress={() => setFundingPrompt(null)}
+              >
+                <Text style={[styles.modalBtnText, styles.modalBtnTextSecondary]}>Keep Unfunded</Text>
+              </Pressable>
+              <Pressable
+                style={styles.modalBtn}
+                onPress={() => {
+                  if (fundingPrompt) {
+                    fundCategoryFromFreeSpend(fundingPrompt.headId, selectedMonthKey);
+                  }
+                  setFundingPrompt(null);
+                }}
+              >
+                <Text style={styles.modalBtnText}>Fund Now</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -258,4 +293,41 @@ const createStyles = (colors: ThemeColors) =>
     },
     smallBtnText: { color: colors.text },
     finishBtn: { marginTop: 8, marginBottom: 24 },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(3, 6, 14, 0.78)",
+      justifyContent: "center",
+      padding: 22,
+    },
+    modalCard: {
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.primarySoft,
+      padding: 16,
+      gap: 12,
+      shadowColor: "#000",
+      shadowOpacity: 0.35,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 8,
+    },
+    modalTitle: { color: colors.text, fontWeight: "800", fontSize: 18 },
+    modalBody: { color: colors.subtext, lineHeight: 20, fontSize: 14 },
+    modalActions: { flexDirection: "row", gap: 10 },
+    modalBtn: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+      paddingVertical: 10,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    modalBtnSecondary: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    modalBtnText: { color: "#fff", fontWeight: "700" },
+    modalBtnTextSecondary: { color: colors.text },
   });
